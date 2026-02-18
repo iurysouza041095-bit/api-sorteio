@@ -1,6 +1,6 @@
 {
-  "name": "api-sorteio-com-limite",
-  "version": "1.0.0",
+  "name": "api-sorteio-segura",
+  "version": "1.1.0",
   "description": "API de sorteio com limite de 5 downloads por IP",
   "main": "api/index.js",
   "dependencies": {
