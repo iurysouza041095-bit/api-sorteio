@@ -2,15 +2,29 @@ const axios = require('axios');
 const { kv } = require('@vercel/kv');
 
 module.exports = async (req, res) => {
-  // 1. Identifica o IP do usuário para o limite
+  // 1. Identifica o IP do usuário
   const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
   const key = `limit:${ip}`;
+  const { check } = req.query; // Pega o parâmetro ?check=1 se existir
 
   try {
-    // 2. Verifica quantos downloads o IP já fez nas últimas 24h
+    // 2. Consulta o banco KV para ver o saldo do IP
     const count = await kv.get(key) || 0;
+    const limit = 5;
+    const remaining = limit - count;
 
-    if (count >= 5) {
+    // 3. Se o usuário quiser apenas ver o status (sem gastar download)
+    if (check) {
+      return res.status(200).json({
+        seu_ip: ip,
+        downloads_feitos_hoje: count,
+        downloads_restantes: remaining > 0 ? remaining : 0,
+        liberado: remaining > 0
+      });
+    }
+
+    // 4. Bloqueio se atingir o limite
+    if (count >= limit) {
       return res.status(429).send("Limite de 5 downloads por dia atingido para este IP.");
     }
 
@@ -20,7 +34,7 @@ module.exports = async (req, res) => {
     const FOLDER = "configs"; 
     const TOKEN = process.env.GITHUB_TOKEN;
 
-    // 3. Busca a lista de arquivos no GitHub
+    // 5. Busca arquivos no repositório privado
     const url = `https://api.github.com/repos/${USER}/${REPO}/contents/${FOLDER}?per_page=1000`;
     const response = await axios.get(url, {
       headers: { 
@@ -35,19 +49,18 @@ module.exports = async (req, res) => {
       return res.status(404).send("Nenhum arquivo .config encontrado.");
     }
 
-    // 4. Sorteia um arquivo aleatório
+    // 6. Sorteio aleatório
     const randomFile = configs[Math.floor(Math.random() * configs.length)];
 
-    // 5. Busca o conteúdo do arquivo sorteado
+    // 7. Busca o conteúdo real do arquivo
     const fileContent = await axios.get(randomFile.download_url, {
       headers: { 'Authorization': `token ${TOKEN}` }
     });
 
-    // 6. Se o download deu certo, aumenta o contador do IP no Banco de Dados
-    // O contador expira automaticamente em 24 horas (86400 segundos)
+    // 8. Se tudo deu certo, registra +1 download no banco KV (expira em 24h)
     await kv.set(key, count + 1, { ex: 86400 });
 
-    // 7. Entrega o arquivo para download
+    // 9. Entrega o arquivo para o usuário
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${randomFile.name}"`);
     res.status(200).send(fileContent.data);
