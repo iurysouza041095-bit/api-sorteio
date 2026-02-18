@@ -1,7 +1,10 @@
 {
-  "name": "api-sorteio",
+  "name": "api-sorteio-com-limite",
   "version": "1.0.0",
+  "description": "API de sorteio com limite de 5 downloads por IP",
+  "main": "api/index.js",
   "dependencies": {
-    "axios": "^1.6.0"
+    "axios": "^1.6.0",
+    "@vercel/kv": "^1.0.1"
   }
 }
