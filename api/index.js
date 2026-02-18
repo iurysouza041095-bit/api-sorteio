@@ -2,18 +2,18 @@ const axios = require('axios');
 const { kv } = require('@vercel/kv');
 
 module.exports = async (req, res) => {
-  // 1. Identifica o IP do usuário
+  // 1. Identifica o IP do usuário para o limite
   const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
   const key = `limit:${ip}`;
-  const { check } = req.query; // Pega o parâmetro ?check=1 se existir
+  const { check } = req.query; // Permite o link ?check=1
 
   try {
-    // 2. Consulta o banco KV para ver o saldo do IP
+    // 2. Consulta o banco: quantos downloads o IP fez hoje?
     const count = await kv.get(key) || 0;
     const limit = 5;
     const remaining = limit - count;
 
-    // 3. Se o usuário quiser apenas ver o status (sem gastar download)
+    // 3. Se for apenas para checar o status (não conta como download)
     if (check) {
       return res.status(200).json({
         seu_ip: ip,
@@ -23,7 +23,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    // 4. Bloqueio se atingir o limite
+    // 4. Bloqueia se já atingiu 5 downloads
     if (count >= limit) {
       return res.status(429).send("Limite de 5 downloads por dia atingido para este IP.");
     }
@@ -57,10 +57,10 @@ module.exports = async (req, res) => {
       headers: { 'Authorization': `token ${TOKEN}` }
     });
 
-    // 8. Se tudo deu certo, registra +1 download no banco KV (expira em 24h)
+    // 8. Se tudo deu certo, registra +1 download no banco (expira em 24h)
     await kv.set(key, count + 1, { ex: 86400 });
 
-    // 9. Entrega o arquivo para o usuário
+    // 9. Entrega o arquivo
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${randomFile.name}"`);
     res.status(200).send(fileContent.data);
